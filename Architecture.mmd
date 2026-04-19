@@ -1,0 +1,42 @@
+graph TB
+    subgraph Internet["Internet"]
+        EC["Element Desktop / Web"]
+        FED["Federated Matrix Servers"]
+    end
+
+    subgraph Server["Server — YOUR_DOMAIN"]
+        subgraph Bridge["Docker Bridge Network"]
+            CADDY["Caddy<br/>Reverse Proxy + Auto TLS (LE)<br/>:443 · :8448"]
+            TW["Tuwunel<br/>Matrix Homeserver<br/>:8008<br/>/_synapse/* IP-restricted"]
+            EL["Element Web<br/>:80"]
+            JWT["lk-jwt-service<br/>:8080"]
+            WK[".well-known<br/>static JSON"]
+        end
+
+        subgraph Host["Host Network"]
+            LK["LiveKit SFU<br/>:7880 API Docker only<br/>:7881 TCP fallback<br/>:50000-60000 UDP"]
+            CT["Coturn<br/>:3478 TURN no-stun<br/>:5349 TURNS<br/>:60001-65535 UDP relay"]
+        end
+    end
+
+    EC -- "HTTPS :443" --> CADDY
+    FED -- ":8448 Federation" --> CADDY
+
+    CADDY -- "/_matrix/*" --> TW
+    CADDY -- "/* fallback" --> EL
+    CADDY -- "/lk-jwt/*" --> JWT
+    CADDY -- "/livekit-sfu/*<br/>host.docker.internal:7880" --> LK
+    CADDY -- "/.well-known/*" --> WK
+
+    JWT -. "YOUR_DOMAIN via host-gateway<br/>OpenID + CreateRoom" .-> CADDY
+
+    EC -. "Group calls<br/>UDP :50000-60000" .-> LK
+    EC -. "1:1 calls<br/>TURN relay :3478" .-> CT
+
+    classDef internet fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef bridge fill:#f3e5f5,stroke:#7b1fa2,color:#000
+    classDef host fill:#fff3e0,stroke:#e65100,color:#000
+
+    class EC,FED internet
+    class CADDY,TW,EL,JWT,WK bridge
+    class LK,CT host

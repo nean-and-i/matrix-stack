@@ -1,0 +1,14 @@
+{
+    "m.homeserver": {
+        "base_url": "https://{{ matrix_domain }}"
+    },
+    "m.identity_server": {
+        "base_url": "{{ element_identity_server }}"
+    },
+    "org.matrix.msc4143.rtc_foci": [
+        {
+            "type": "livekit",
+            "livekit_service_url": "https://{{ matrix_domain }}/lk-jwt"
+        }
+    ]
+}

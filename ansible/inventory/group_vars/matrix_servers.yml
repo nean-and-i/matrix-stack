@@ -1,0 +1,92 @@
+---
+################################################################################
+# Matrix Homeserver — Ansible Variables
+# Override any of these per-host in inventory/hosts.yml
+################################################################################
+
+# ── Domain & Network ──────────────────────────────────────────────
+matrix_domain: "YOUR_DOMAIN"  # Your Matrix domain (e.g. example.com)
+matrix_admin_email: "YOUR_EMAIL"  # Email for Let's Encrypt renewal notices
+matrix_server_ipv4: "YOUR_IPV4"  # Public IPv4 address
+matrix_server_ipv6: "YOUR_IPV6"  # Public IPv6 address
+matrix_install_dir: "/opt/matrix"
+
+# ── Docker Images ─────────────────────────────────────────────────
+tuwunel_image: "ghcr.io/matrix-construct/tuwunel:latest"
+caddy_image: "caddy:latest"
+element_image: "vectorim/element-web:latest"
+livekit_image: "livekit/livekit-server:latest"
+livekit_jwt_image: "ghcr.io/element-hq/lk-jwt-service:latest"
+coturn_image: "coturn/coturn:latest"
+
+# ── Tuwunel (Matrix Homeserver) ───────────────────────────────────
+tuwunel_port: 8008
+tuwunel_db_cache_mb: 512
+tuwunel_max_request_size: 52428800  # 50 MB
+tuwunel_allow_registration: true
+tuwunel_allow_federation: true
+tuwunel_allow_presence: true
+
+# ── Caddy (Reverse Proxy) ────────────────────────────────────────
+caddy_http_port: 80
+caddy_https_port: 443
+caddy_federation_port: 8448
+
+# ── Coturn (TURN/STUN for 1:1 calls) ─────────────────────────────
+coturn_listening_port: 3478
+coturn_tls_port: 5349
+coturn_relay_min_port: 60001
+coturn_relay_max_port: 65535
+coturn_verbose: false
+coturn_max_bps: 2000000  # ~2 Mbps per-session bandwidth cap
+
+# ── LiveKit (SFU for group video) ─────────────────────────────────
+livekit_ws_port: 7880
+livekit_rtc_tcp_port: 7881
+livekit_media_port_start: 50000
+livekit_media_port_end: 60000
+livekit_max_participants: 50
+livekit_room_empty_timeout: 300
+livekit_room_departure_timeout: 20
+livekit_log_level: "info"
+livekit_pion_log_level: "warn"
+
+# ── LiveKit JWT Service ───────────────────────────────────────────
+livekit_jwt_port: 8080
+
+# ── Element Web ───────────────────────────────────────────────────
+element_brand: "Element"
+element_identity_server: "https://vector.im"
+element_call_url: "https://call.element.io"
+element_call_participant_limit: 8
+element_show_labs: true
+element_room_directory_servers:
+  - "{{ matrix_domain }}"
+  - "matrix.org"
+
+# ── TURN URIs (advertised to Matrix clients) ─────────────────────
+turn_uris:
+  - "turn:{{ matrix_domain }}:{{ coturn_listening_port }}?transport=udp"
+  - "turn:{{ matrix_domain }}:{{ coturn_listening_port }}?transport=tcp"
+  - "turns:{{ matrix_domain }}:{{ coturn_tls_port }}?transport=tcp"
+turn_ttl: 3600  # 1 hour (clients auto-refresh before expiry)
+
+# ── Keycloak SSO (External Identity Provider) ────────────────────
+# Uncomment and configure to enable Keycloak SSO login.
+# See docs/keycloak-integration.md for full setup instructions.
+#keycloak_enabled: false
+#keycloak_brand: "keycloak"
+#keycloak_client_id: "matrix-tuwunel"
+#keycloak_issuer_url: "https://auth.example.com/realms/matrix"
+#keycloak_provider_name: "Keycloak"
+#keycloak_trusted: true
+#keycloak_registration: true
+#keycloak_default: true
+
+# ── Firewall ──────────────────────────────────────────────────────
+firewall_enabled: true
+firewall_ssh_port: 22
+
+# ── File Permissions ──────────────────────────────────────────────
+secret_file_mode: "0600"
+config_file_mode: "0644"

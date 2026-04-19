@@ -1,0 +1,139 @@
+# Caddyfile for Matrix Homeserver (Tuwunel) + LiveKit SFU
+# Configure YOUR_DOMAIN, YOUR_EMAIL, and YOUR_IPV4/YOUR_IPV6 before deployment
+
+{
+	email YOUR_EMAIL
+}
+
+# Main site - Matrix client API, well-known, Element Web, LiveKit
+YOUR_DOMAIN {
+	# Security headers
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header X-Content-Type-Options "nosniff"
+	header X-Frame-Options "SAMEORIGIN"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+	header Permissions-Policy "geolocation=(), payment=(), usb=()"
+	header -Server
+
+	# Logging — stdout for Docker log collection
+	log {
+		output stdout
+		format json
+	}
+
+	# CORS handler for OPTIONS requests (Matrix spec requires open CORS on these paths)
+	@options {
+		method OPTIONS
+		path /_matrix/* /.well-known/*
+	}
+	handle @options {
+		header Access-Control-Allow-Origin *
+		header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+		header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization"
+		header Access-Control-Max-Age "3600"
+		respond 204
+	}
+
+	# ── LiveKit JWT Service (Element Call token generation) ────────
+	# Element Call requests LiveKit tokens from this endpoint.
+	# The JWT service validates Matrix auth and issues LiveKit JWTs.
+	handle_path /lk-jwt/* {
+		reverse_proxy livekit-jwt:8080
+	}
+
+	# ── LiveKit SFU WebSocket (video/audio signaling) ─────────────
+	# Element Call connects here for group call signaling.
+	# Media flows directly via UDP (ports 50000-60000).
+	handle_path /livekit-sfu/* {
+		reverse_proxy host.docker.internal:7880 {
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			flush_interval -1
+		}
+	}
+
+	# Matrix Client-Server API
+	@matrix path_regexp ^/_matrix/
+	handle @matrix {
+		reverse_proxy tuwunel:8008 {
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			transport http {
+				read_timeout 300s
+				write_timeout 300s
+				dial_timeout 30s
+				response_header_timeout 300s
+				keepalive 30s
+				keepalive_idle_conns 10
+			}
+			flush_interval -1
+		}
+	}
+
+	# Matrix Synapse Admin API — restricted to server IP only
+	@synapse {
+		path_regexp ^/_synapse/
+		remote_ip 127.0.0.1/8 ::1 YOUR_IPV4 YOUR_IPV6
+	}
+	handle @synapse {
+		reverse_proxy tuwunel:8008 {
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			transport http {
+				read_timeout 300s
+				write_timeout 300s
+				dial_timeout 30s
+			}
+		}
+	}
+
+	# Well-known delegation for Matrix
+	handle_path /.well-known/* {
+		header Content-Type application/json
+		header Access-Control-Allow-Origin *
+		header Cache-Control "max-age=3600, must-revalidate"
+		root * /srv/wellknown
+		file_server
+	}
+
+	# Element Web client (served from official Docker image)
+	handle {
+		reverse_proxy element:80
+	}
+}
+
+# Matrix Federation API (port 8448)
+YOUR_DOMAIN:8448 {
+	# Security headers
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header X-Content-Type-Options "nosniff"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+	header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	header -Server
+
+	# Logging — stdout for Docker log collection
+	log {
+		output stdout
+		format json
+	}
+
+	# Matrix Federation API
+	@federation path_regexp ^/_matrix/
+	handle @federation {
+		reverse_proxy tuwunel:8008 {
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			transport http {
+				read_timeout 300s
+				write_timeout 300s
+				dial_timeout 30s
+				response_header_timeout 300s
+			}
+		}
+	}
+
+	# Fallback
+	handle {
+		respond 404
+	}
+}

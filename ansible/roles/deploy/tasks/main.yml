@@ -1,0 +1,115 @@
+---
+# Role: deploy
+# Pulls Docker images and starts the full Matrix stack.
+# Runs health checks to verify the deployment.
+
+- name: Pull all Docker images
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: "{{ matrix_install_dir }}"
+  register: pull_result
+  changed_when: "'Pull complete' in pull_result.stdout or 'Downloaded' in pull_result.stderr"
+
+- name: Start Matrix stack
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: "{{ matrix_install_dir }}"
+  register: compose_up
+  changed_when: "'Started' in compose_up.stderr or 'Creating' in compose_up.stderr"
+
+- name: Wait for services to initialize
+  ansible.builtin.pause:
+    seconds: 30
+
+- name: Check container status
+  ansible.builtin.shell: docker compose ps --format json
+  args:
+    chdir: "{{ matrix_install_dir }}"
+  register: container_status
+  changed_when: false
+
+- name: Display container status
+  ansible.builtin.debug:
+    msg: "{{ container_status.stdout }}"
+
+# ── Health Checks ─────────────────────────────────────────────────
+
+- name: Test Matrix Client API (internal)
+  ansible.builtin.shell: >
+    docker compose exec -T caddy
+    curl -f -s http://tuwunel:{{ tuwunel_port }}/_matrix/client/versions
+  args:
+    chdir: "{{ matrix_install_dir }}"
+  register: client_api_test
+  retries: 3
+  delay: 10
+  until: client_api_test.rc == 0
+  changed_when: false
+  failed_when: false
+
+- name: Report Client API status
+  ansible.builtin.debug:
+    msg: "{{ '✓ Matrix Client API is responding' if client_api_test.rc == 0 else '✗ Matrix Client API not responding — check logs' }}"
+
+- name: Test well-known server (internal)
+  ansible.builtin.shell: >
+    docker compose exec -T caddy
+    curl -f -s http://localhost/.well-known/matrix/server
+  args:
+    chdir: "{{ matrix_install_dir }}"
+  register: wellknown_test
+  changed_when: false
+  failed_when: false
+
+- name: Report well-known status
+  ansible.builtin.debug:
+    msg: "{{ '✓ Well-known delegation is working' if wellknown_test.rc == 0 else '✗ Well-known not responding' }}"
+
+- name: Test LiveKit JWT service
+  ansible.builtin.shell: >
+    docker compose exec -T caddy
+    curl -f -s -o /dev/null -w '%{http_code}' http://livekit-jwt:{{ livekit_jwt_port }}/
+  args:
+    chdir: "{{ matrix_install_dir }}"
+  register: livekit_jwt_test
+  changed_when: false
+  failed_when: false
+
+- name: Report LiveKit JWT status
+  ansible.builtin.debug:
+    msg: "{{ '✓ LiveKit JWT service is reachable' if livekit_jwt_test.rc == 0 else '⚠ LiveKit JWT service not responding (may still be starting)' }}"
+
+# ── Coturn TLS cert renewal ───────────────────────────────────────
+# Coturn reads TLS certs at startup only. Caddy renews Let's Encrypt
+# certs automatically, but coturn needs a restart to pick them up.
+- name: Schedule weekly coturn restart for TLS cert refresh
+  ansible.builtin.cron:
+    name: "coturn-tls-cert-refresh"
+    minute: "0"
+    hour: "4"
+    weekday: "0"
+    user: root
+    job: "cd {{ matrix_install_dir }} && docker compose restart coturn >> /var/log/coturn-restart.log 2>&1"
+
+# ── Final Summary ─────────────────────────────────────────────────
+
+- name: Deployment summary
+  ansible.builtin.debug:
+    msg: |
+      ═══════════════════════════════════════════════════════
+      Matrix Homeserver Deployed Successfully!
+      ═══════════════════════════════════════════════════════
+      Domain:      https://{{ matrix_domain }}
+      Federation:  https://{{ matrix_domain }}:{{ caddy_federation_port }}
+      Element Web: https://{{ matrix_domain }}/
+      ───────────────────────────────────────────────────────
+      Registration Token: {{ registration_token }}
+      ───────────────────────────────────────────────────────
+      Secrets stored in:  {{ matrix_install_dir }}/
+        - registration_token
+        - turn_shared_secret
+        - livekit_api_key
+        - livekit_api_secret
+      ───────────────────────────────────────────────────────
+      Logs: cd {{ matrix_install_dir }} && docker compose logs -f
+      ═══════════════════════════════════════════════════════

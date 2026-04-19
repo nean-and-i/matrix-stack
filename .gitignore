@@ -1,0 +1,49 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment/local config
+.env
+.env.*
+*.local
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build/output
+dist/
+build/
+out/
+target/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+docker-data/
+
+# ansible
+.ansible-lint
+.ansible

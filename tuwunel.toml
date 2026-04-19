@@ -1,0 +1,44 @@
+# Tuwunel Matrix Homeserver Configuration
+# https://github.com/matrix-construct/tuwunel
+
+[global]
+# Server identity
+server_name = "YOUR_DOMAIN"
+
+# Database configuration
+database_path = "/var/lib/tuwunel"
+
+# Network configuration
+address = "0.0.0.0"
+port = 8008
+
+# Performance tuning - optimized for production
+# RocksDB cache (increased for better performance)
+db_cache_capacity_mb = 512
+
+# Registration configuration
+# Registration is protected - users need a registration token
+allow_registration = true
+registration_token = "PLACEHOLDER_REGISTRATION_TOKEN"
+
+# Federation
+allow_federation = true
+
+# Media
+max_request_size       = 52428800   # 50 MB in bytes
+allow_local_presence   = true
+allow_incoming_presence = true
+
+# TURN/TURNS configuration for VoIP and video calls
+turn_uris = ["turn:YOUR_DOMAIN:3478?transport=udp", "turn:YOUR_DOMAIN:3478?transport=tcp", "turns:YOUR_DOMAIN:5349?transport=tcp"]
+turn_secret_file = "/etc/tuwunel/turn_shared_secret"
+turn_ttl = 3600  # 1 hour (clients auto-refresh before expiry)
+
+# Well-known configuration for MatrixRTC / Element Call (MSC4143)
+[global.well_known]
+client = "https://YOUR_DOMAIN"
+server = "YOUR_DOMAIN:443"
+
+[[global.well_known.rtc_transports]]
+type = "livekit"
+livekit_service_url = "https://YOUR_DOMAIN/lk-jwt"

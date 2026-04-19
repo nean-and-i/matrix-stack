@@ -1,0 +1,144 @@
+services:
+  tuwunel:
+    image: ghcr.io/matrix-construct/tuwunel:latest
+    container_name: tuwunel
+    restart: unless-stopped
+    platform: linux/amd64
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    environment:
+      TUWUNEL_CONFIG: /etc/tuwunel/tuwunel.toml
+      # RUST_LOG: info
+      # RUST_BACKTRACE: 1
+    volumes:
+      - tuwunel_data:/var/lib/tuwunel
+      - ./tuwunel.toml:/etc/tuwunel/tuwunel.toml:ro
+      - ./turn_shared_secret:/etc/tuwunel/turn_shared_secret:ro
+    networks:
+      - matrix_internal
+    expose:
+      - "8008"
+    # Healthcheck disabled - tuwunel container lacks curl/wget
+    # Container logs show successful startup: "Listening on [0.0.0.0:8008]"
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # QUIC
+      - "8448:8448"    # Matrix Federation
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./wellknown:/srv/wellknown:ro
+    networks:
+      - matrix_internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - tuwunel
+      - element
+
+  element:
+    image: vectorim/element-web:latest
+    container_name: element
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    networks:
+      - matrix_internal
+    volumes:
+      - ./element-config.json:/app/config.json:ro
+      - ./element-config.json:/app/config.YOUR_DOMAIN.json:ro
+
+  # ── LiveKit SFU ─────────────────────────────────────────────────
+  # Selective Forwarding Unit for group video/voice calls.
+  # Runs on host network for direct UDP media access.
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    network_mode: host
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    command: ["--config", "/etc/livekit.yaml"]
+
+  # ── LiveKit JWT Service ─────────────────────────────────────────
+  # Bridges Matrix authentication → LiveKit JWT tokens.
+  # Element Call requests tokens from this service before connecting
+  # to the LiveKit SFU.
+  livekit-jwt:
+    image: ghcr.io/element-hq/lk-jwt-service:latest
+    container_name: livekit-jwt
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    environment:
+      - LK_JWT_PORT=8080
+      - LIVEKIT_URL=wss://YOUR_DOMAIN/livekit-sfu
+      - LIVEKIT_KEY=PLACEHOLDER_LIVEKIT_KEY
+      - LIVEKIT_SECRET=PLACEHOLDER_LIVEKIT_SECRET
+    networks:
+      - matrix_internal
+    expose:
+      - "8080"
+    extra_hosts:
+      - "YOUR_DOMAIN:host-gateway"
+    depends_on:
+      - livekit
+      - caddy
+
+  # ── Coturn TURN/STUN ────────────────────────────────────────────
+  # Relay server for 1:1 WebRTC calls (NAT traversal fallback).
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    network_mode: host
+    volumes:
+      - ./coturn.conf:/etc/coturn/turnserver.conf:ro
+      - ./turn_shared_secret:/etc/coturn/turn_shared_secret:ro
+      - caddy_data:/etc/coturn/caddy-data:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    depends_on:
+      - caddy
+
+networks:
+  matrix_internal:
+    driver: bridge
+
+volumes:
+  tuwunel_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local

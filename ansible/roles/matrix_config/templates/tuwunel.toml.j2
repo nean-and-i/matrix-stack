@@ -1,0 +1,53 @@
+# Tuwunel Matrix Homeserver Configuration
+# Managed by Ansible — do not edit manually
+
+[global]
+server_name = "{{ matrix_domain }}"
+database_path = "/var/lib/tuwunel"
+
+# Network
+address = "0.0.0.0"
+port = {{ tuwunel_port }}
+
+# Performance
+db_cache_capacity_mb = {{ tuwunel_db_cache_mb }}
+
+# Registration (token-protected)
+allow_registration = {{ tuwunel_allow_registration | lower }}
+registration_token = "{{ registration_token }}"
+
+# Federation
+allow_federation = {{ tuwunel_allow_federation | lower }}
+
+# Media & Presence
+max_request_size       = {{ tuwunel_max_request_size }}
+allow_local_presence   = {{ tuwunel_allow_presence | lower }}
+allow_incoming_presence = {{ tuwunel_allow_presence | lower }}
+
+# TURN for VoIP and video calls
+turn_uris = [{% for uri in turn_uris %}"{{ uri }}"{{ ", " if not loop.last else "" }}{% endfor %}]
+turn_secret_file = "/etc/tuwunel/turn_shared_secret"
+turn_ttl = {{ turn_ttl }}
+
+# Well-known configuration for MatrixRTC / Element Call (MSC4143)
+[global.well_known]
+client = "https://{{ matrix_domain }}"
+server = "{{ matrix_domain }}:443"
+
+[[global.well_known.rtc_transports]]
+type = "livekit"
+livekit_service_url = "https://{{ matrix_domain }}/lk-jwt"
+
+{% if keycloak_enabled | default(false) %}
+# Keycloak SSO (External Identity Provider)
+[[global.identity_provider]]
+brand = "{{ keycloak_brand | default('keycloak') }}"
+client_id = "{{ keycloak_client_id }}"
+client_secret_file = "/etc/tuwunel/keycloak_client_secret"
+issuer_url = "{{ keycloak_issuer_url }}"
+callback_url = "https://{{ matrix_domain }}/_matrix/client/unstable/login/sso/callback/{{ keycloak_client_id }}"
+name = "{{ keycloak_provider_name | default('Keycloak') }}"
+default = {{ keycloak_default | default(true) | lower }}
+trusted = {{ keycloak_trusted | default(true) | lower }}
+registration = {{ keycloak_registration | default(true) | lower }}
+{% endif %}

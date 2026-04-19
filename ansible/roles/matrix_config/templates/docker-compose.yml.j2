@@ -1,0 +1,132 @@
+services:
+  tuwunel:
+    image: {{ tuwunel_image }}
+    container_name: tuwunel
+    restart: unless-stopped
+    platform: linux/amd64
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    environment:
+      TUWUNEL_CONFIG: /etc/tuwunel/tuwunel.toml
+    volumes:
+      - tuwunel_data:/var/lib/tuwunel
+      - ./tuwunel.toml:/etc/tuwunel/tuwunel.toml:ro
+      - ./turn_shared_secret:/etc/tuwunel/turn_shared_secret:ro
+    networks:
+      - matrix_internal
+    expose:
+      - "{{ tuwunel_port }}"
+
+  caddy:
+    image: {{ caddy_image }}
+    container_name: caddy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    ports:
+      - "{{ caddy_http_port }}:80"
+      - "{{ caddy_https_port }}:443"
+      - "{{ caddy_https_port }}:443/udp"
+      - "{{ caddy_federation_port }}:{{ caddy_federation_port }}"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./wellknown:/srv/wellknown:ro
+    networks:
+      - matrix_internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - tuwunel
+      - element
+      - livekit-jwt
+
+  element:
+    image: {{ element_image }}
+    container_name: element
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    networks:
+      - matrix_internal
+    volumes:
+      - ./element-config.json:/app/config.json:ro
+      - ./element-config.json:/app/config.{{ matrix_domain }}.json:ro
+
+  livekit:
+    image: {{ livekit_image }}
+    container_name: livekit
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    network_mode: host
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    command: ["--config", "/etc/livekit.yaml"]
+
+  livekit-jwt:
+    image: {{ livekit_jwt_image }}
+    container_name: livekit-jwt
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    environment:
+      - LK_JWT_PORT={{ livekit_jwt_port }}
+      - LIVEKIT_URL=wss://{{ matrix_domain }}/livekit-sfu
+      - LIVEKIT_KEY={{ livekit_api_key }}
+      - LIVEKIT_SECRET={{ livekit_api_secret }}
+    networks:
+      - matrix_internal
+    expose:
+      - "{{ livekit_jwt_port }}"
+    extra_hosts:
+      - "{{ matrix_domain }}:host-gateway"
+    depends_on:
+      - livekit
+      - caddy
+
+  coturn:
+    image: {{ coturn_image }}
+    container_name: coturn
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "3"
+    network_mode: host
+    volumes:
+      - ./coturn.conf:/etc/coturn/turnserver.conf:ro
+      - ./turn_shared_secret:/etc/coturn/turn_shared_secret:ro
+      - caddy_data:/etc/coturn/caddy-data:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    depends_on:
+      - caddy
+
+networks:
+  matrix_internal:
+    driver: bridge
+
+volumes:
+  tuwunel_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local

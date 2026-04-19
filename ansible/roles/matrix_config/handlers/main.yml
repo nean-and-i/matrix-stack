@@ -1,0 +1,5 @@
+---
+- name: restart matrix stack
+  ansible.builtin.shell: |
+    cd {{ matrix_install_dir }} && docker compose up -d --force-recreate
+  listen: restart matrix stack

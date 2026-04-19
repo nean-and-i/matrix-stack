@@ -1,0 +1,74 @@
+---
+# Role: matrix_config
+# Renders all configuration files from Jinja2 templates with secrets injected.
+# Notifies the deploy handler to restart services when configs change.
+
+- name: Deploy docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ matrix_install_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart matrix stack
+
+- name: Deploy tuwunel.toml
+  ansible.builtin.template:
+    src: tuwunel.toml.j2
+    dest: "{{ matrix_install_dir }}/tuwunel.toml"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart matrix stack
+
+- name: Deploy Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ matrix_install_dir }}/Caddyfile"
+    owner: root
+    group: root
+    mode: "{{ config_file_mode }}"
+  notify: restart matrix stack
+
+- name: Deploy coturn.conf
+  ansible.builtin.template:
+    src: coturn.conf.j2
+    dest: "{{ matrix_install_dir }}/coturn.conf"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart matrix stack
+
+- name: Deploy livekit.yaml
+  ansible.builtin.template:
+    src: livekit.yaml.j2
+    dest: "{{ matrix_install_dir }}/livekit.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart matrix stack
+
+- name: Deploy element-config.json
+  ansible.builtin.template:
+    src: element-config.json.j2
+    dest: "{{ matrix_install_dir }}/element-config.json"
+    owner: root
+    group: root
+    mode: "{{ config_file_mode }}"
+  notify: restart matrix stack
+
+- name: Deploy well-known server
+  ansible.builtin.template:
+    src: wellknown-server.json.j2
+    dest: "{{ matrix_install_dir }}/wellknown/matrix/server"
+    owner: root
+    group: root
+    mode: "{{ config_file_mode }}"
+
+- name: Deploy well-known client
+  ansible.builtin.template:
+    src: wellknown-client.json.j2
+    dest: "{{ matrix_install_dir }}/wellknown/matrix/client"
+    owner: root
+    group: root
+    mode: "{{ config_file_mode }}"

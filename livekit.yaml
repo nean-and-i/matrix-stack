@@ -1,0 +1,56 @@
+# LiveKit SFU Server Configuration
+# Selective Forwarding Unit for Matrix group video/voice calls via Element Call
+# https://docs.livekit.io/realtime/self-hosting/deployment/
+
+port: 7880
+
+bind_addresses:
+  - ""
+  # - "127.0.0.1" # not working
+
+rtc:
+  # TCP port for WebRTC (fallback when UDP is blocked)
+  tcp_port: 7881
+  # UDP port range for media streams
+  port_range_start: 50000
+  port_range_end: 60000
+  # Use server's external IP for ICE candidates
+  use_external_ip: true
+  # Server public IPv4 (must match your server)
+  # IPv6 is auto-discovered via use_external_ip: true
+  node_ip: "YOUR_IPV4"
+  # Enable ICE over TCP as fallback for restricted networks
+  enable_loopback_candidate: false
+  # PLI throttle (Picture Loss Indication) - lower = faster recovery
+
+
+# API authentication keys (replaced by setup.sh)
+keys:
+  PLACEHOLDER_LIVEKIT_KEY: PLACEHOLDER_LIVEKIT_SECRET
+
+# TURN is handled by standalone Coturn for 1:1 calls.
+# For group calls, LiveKit uses direct UDP/TCP connections to SFU.
+# Clients behind strict NATs fall back to TCP port 7881.
+turn:
+  enabled: false
+
+# Logging
+logging:
+  level: info
+  pion_level: warn
+
+# Room settings
+room:
+  # Max participants per room (adjust based on server capacity)
+  max_participants: 50
+  # Close empty rooms after this many seconds
+  empty_timeout: 300
+  # Grace period after last participant leaves
+  departure_timeout: 20
+
+# Resource limits
+limit:
+  # Max metadata size in bytes
+  max_metadata_size: 64000
+  # Max room name length
+  max_room_name_length: 256

@@ -1,0 +1,36 @@
+# LiveKit SFU Server Configuration
+# Managed by Ansible — do not edit manually
+
+port: {{ livekit_ws_port }}
+
+bind_addresses:
+  - ""
+  # Note: "127.0.0.1" would be more secure but doesn't work with LiveKit's
+  # host network mode — Caddy's host.docker.internal can't reach it.
+
+rtc:
+  tcp_port: {{ livekit_rtc_tcp_port }}
+  port_range_start: {{ livekit_media_port_start }}
+  port_range_end: {{ livekit_media_port_end }}
+  use_external_ip: true
+  node_ip: "{{ matrix_server_ipv4 }}"
+  enable_loopback_candidate: false
+
+keys:
+  {{ livekit_api_key }}: {{ livekit_api_secret }}
+
+turn:
+  enabled: false
+
+logging:
+  level: {{ livekit_log_level }}
+  pion_level: {{ livekit_pion_log_level }}
+
+room:
+  max_participants: {{ livekit_max_participants }}
+  empty_timeout: {{ livekit_room_empty_timeout }}
+  departure_timeout: {{ livekit_room_departure_timeout }}
+
+limit:
+  max_metadata_size: 64000
+  max_room_name_length: 256

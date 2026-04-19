@@ -1,0 +1,14 @@
+{
+    "m.homeserver": {
+        "base_url": "https://YOUR_DOMAIN"
+    },
+    "m.identity_server": {
+        "base_url": "https://vector.im"
+    },
+    "org.matrix.msc4143.rtc_foci": [
+        {
+            "type": "livekit",
+            "livekit_service_url": "https://YOUR_DOMAIN/lk-jwt"
+        }
+    ]
+}

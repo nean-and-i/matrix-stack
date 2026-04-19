@@ -1,0 +1,66 @@
+# Coturn TURN/STUN server configuration
+# Managed by Ansible — do not edit manually
+
+listening-port={{ coturn_listening_port }}
+tls-listening-port={{ coturn_tls_port }}
+
+# Relay ports (adjusted to avoid LiveKit SFU range)
+min-port={{ coturn_relay_min_port }}
+max-port={{ coturn_relay_max_port }}
+
+# External IPs
+external-ip={{ matrix_server_ipv4 }}
+external-ip={{ matrix_server_ipv6 }}
+
+# Realm
+realm={{ matrix_domain }}
+server-name={{ matrix_domain }}
+
+# Authentication
+use-auth-secret
+static-auth-secret={{ turn_shared_secret }}
+
+# TLS Certificates — mounted from Caddy's Let's Encrypt storage
+# caddy_data volume is mounted at /etc/coturn/caddy-data
+cert=/etc/coturn/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/{{ matrix_domain }}/{{ matrix_domain }}.crt
+pkey=/etc/coturn/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/{{ matrix_domain }}/{{ matrix_domain }}.key
+
+# Security
+no-multicast-peers
+no-cli
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+# CGNAT (RFC 6598)
+denied-peer-ip=100.64.0.0-100.127.255.255
+# Loopback
+denied-peer-ip=127.0.0.0-127.255.255.255
+# Link-local
+denied-peer-ip=169.254.0.0-169.254.255.255
+# IPv6 loopback
+denied-peer-ip=::1-::1
+# IPv6 link-local
+denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+# IPv6 ULA (private)
+denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+
+# Logging
+log-file=stdout
+{% if coturn_verbose %}
+verbose
+{% endif %}
+
+# Performance
+listening-ip=0.0.0.0
+listening-ip=::
+fingerprint
+no-software-attribute
+tcp-proxy-port={{ coturn_listening_port }}
+mobility
+
+# Disable unauthenticated STUN to prevent UDP amplification attacks
+no-stun
+max-bps={{ coturn_max_bps }}
+user-quota=0
+total-quota=0

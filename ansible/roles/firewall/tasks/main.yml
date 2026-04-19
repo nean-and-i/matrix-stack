@@ -1,0 +1,91 @@
+---
+# Role: firewall
+# Configures UFW firewall rules for all Matrix stack services.
+
+- name: Ensure UFW is installed
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "{{ firewall_ssh_port }}"
+    proto: tcp
+
+- name: Allow HTTP
+  community.general.ufw:
+    rule: allow
+    port: "{{ caddy_http_port }}"
+    proto: tcp
+
+- name: Allow HTTPS (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ caddy_https_port }}"
+    proto: tcp
+
+- name: Allow HTTPS (UDP / QUIC)
+  community.general.ufw:
+    rule: allow
+    port: "{{ caddy_https_port }}"
+    proto: udp
+
+- name: Allow Matrix Federation
+  community.general.ufw:
+    rule: allow
+    port: "{{ caddy_federation_port }}"
+    proto: tcp
+
+- name: Allow TURN/STUN (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ coturn_listening_port }}"
+    proto: tcp
+
+- name: Allow TURN/STUN (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ coturn_listening_port }}"
+    proto: udp
+
+- name: Allow TURNS (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ coturn_tls_port }}"
+    proto: tcp
+
+- name: Allow Coturn relay ports (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ coturn_relay_min_port }}:{{ coturn_relay_max_port }}"
+    proto: udp
+
+- name: Allow LiveKit API/WebSocket from Docker networks only
+  community.general.ufw:
+    rule: allow
+    port: "{{ livekit_ws_port }}"
+    proto: tcp
+    from_ip: 172.16.0.0/12
+
+- name: Allow LiveKit WebRTC TCP fallback
+  community.general.ufw:
+    rule: allow
+    port: "{{ livekit_rtc_tcp_port }}"
+    proto: tcp
+
+- name: Allow LiveKit SFU media ports (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ livekit_media_port_start }}:{{ livekit_media_port_end }}"
+    proto: udp
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Reload UFW
+  ansible.builtin.command: ufw reload
+  changed_when: true

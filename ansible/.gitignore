@@ -1,0 +1,14 @@
+# Ansible runtime files
+*.retry
+*.pyc
+__pycache__/
+
+# Sensitive data — never commit secrets
+**/secrets/
+**/turn_shared_secret
+**/registration_token
+**/livekit_api_key
+**/livekit_api_secret
+
+# Vault password file
+.vault_pass
