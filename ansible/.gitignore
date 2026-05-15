@@ -4,7 +4,6 @@
 __pycache__/
 
 # Sensitive data — never commit secrets
-**/secrets/
 **/turn_shared_secret
 **/registration_token
 **/livekit_api_key
