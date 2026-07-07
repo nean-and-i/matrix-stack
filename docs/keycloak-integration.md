@@ -32,6 +32,31 @@ to Tuwunel's callback URL with an authorization code. Tuwunel exchanges
 the code for tokens, reads user claims, and creates or matches a Matrix
 account.
 
+### Native OIDC vs legacy SSO — and why Caddy routing matters
+
+Configuring **both** an `[[global.identity_provider]]` block **and**
+`[global.well_known.client]` (which this stack always sets, for Element Call)
+automatically activates Tuwunel's **next-gen native OIDC server**. Tuwunel then
+publishes its own OpenID discovery document at
+`/.well-known/openid-configuration` and serves OIDC endpoints under
+`/_tuwunel/oidc/*`. This drives the **"Sign In"** button.
+
+The **"Register"** button still uses the older SSO redirect flow, which only
+needs `/_matrix/client/v3/login/sso/redirect/*` (already covered by the generic
+`/_matrix/*` proxy rule).
+
+> **Critical for reverse proxies (see [Step 3.5](#step-35--caddy-routing-for-native-oidc-required))**:
+> `/.well-known/openid-configuration` must be proxied to Tuwunel **before** any
+> static `/.well-known/*` file handler. Caddy uses first-match-wins routing, so
+> if the static well-known file server matches first, the discovery document
+> 404s and native OIDC "Sign In" breaks — while "Register" keeps working, which
+> makes this failure easy to misdiagnose. The Caddyfile shipped with this repo
+> already handles this; the step below documents it for custom proxies.
+
+Both buttons ultimately delegate upstream to Keycloak using the same
+`callback_url`, so **no extra Keycloak redirect URI is required** for native
+OIDC beyond the one registered in Step 1.2.
+
 ---
 
 ## Step 1 — Configure Keycloak
@@ -101,20 +126,40 @@ By default, Tuwunel derives the Matrix username from standard OIDC claims
 
 ---
 
-## Step 2 — Store the Client Secret
+## Step 2 — Provide the Client Secret
 
-Create a secret file on the server with restricted permissions:
+How you supply the secret from Step 1.3 depends on your deployment path.
+
+### Ansible path (recommended)
+
+The Ansible template renders the secret **inline** into `tuwunel.toml` from the
+`keycloak_client_secret` variable — it does **not** read a
+`keycloak_client_secret` file, and the `secrets` role does **not** generate one.
+Set the variable in `ansible/inventory/group_vars/matrix_servers.yml`:
+
+```yaml
+keycloak_client_secret: "the-secret-from-step-1.3"
+```
+
+> **Security**: The shipped default is a plaintext placeholder. Storing a live
+> client secret as plaintext in `group_vars` is not ideal — encrypt it with
+> [Ansible Vault](https://docs.ansible.com/ansible/latest/vault_guide/index.html):
+> ```bash
+> ansible-vault encrypt_string 'the-secret-from-step-1.3' --name 'keycloak_client_secret'
+> ```
+> and paste the resulting block into `group_vars`, then run the playbook with
+> `--ask-vault-pass`.
+
+### Manual path (non-Ansible)
+
+If you edit `tuwunel.toml` by hand, you can instead keep the secret in a
+file-mounted secret (see Step 3, Option A, and Step 4):
 
 ```bash
 # On the Matrix server
-echo -n 'YOUR_KEYCLOAK_CLIENT_SECRET' | sudo tee /opt/matrix/keycloak_client_secret > /dev/null
+echo -n 'the-secret-from-step-1.3' | sudo tee /opt/matrix/keycloak_client_secret > /dev/null
 sudo chmod 600 /opt/matrix/keycloak_client_secret
 ```
-
-Replace `YOUR_KEYCLOAK_CLIENT_SECRET` with the secret from Step 1.3.
-
-If you deploy with Ansible, this file must exist before running
-`ansible-playbook site.yml`.
 
 ---
 
@@ -137,6 +182,16 @@ default = true
 trusted = true
 registration = true
 ```
+
+> **Inline secret vs file**: The example above uses `client_secret_file` (paired
+> with the file mount in Step 4). Alternatively, use `client_secret = "..."`
+> inline. The Ansible template (`tuwunel.toml.j2`) uses the **inline** form,
+> sourced from the `keycloak_client_secret` variable (Step 2) — it does not use
+> `client_secret_file`.
+
+> **`single_sso` placement**: `single_sso` is a top-level `[global]` key (see
+> [Optional: Single SSO Button](#optional-single-sso-button)), **not** a field
+> of the `[[global.identity_provider]]` block. Place it under `[global]`.
 
 **Configuration fields explained:**
 
@@ -163,15 +218,54 @@ See [Ansible Deployment](#ansible-deployment) below.
 
 ---
 
-## Step 4 — Mount the Secret in Docker
+## Step 3.5 — Caddy routing for native OIDC (required)
+
+As explained in the [Architecture Overview](#native-oidc-vs-legacy-sso--and-why-caddy-routing-matters),
+enabling the identity provider activates Tuwunel's native OIDC server, whose
+discovery document lives at `/.well-known/openid-configuration`. Your reverse
+proxy **must** route that path and `/_tuwunel/oidc/*` to Tuwunel **before** any
+static `/.well-known/*` file handler.
+
+**The Caddyfile in this repo already does this** — no action needed if you
+deploy the shipped `Caddyfile` (or the Ansible `Caddyfile.j2`). This step is
+only relevant if you maintain a custom Caddyfile or a different reverse proxy.
+
+The required Caddy block, which must appear **before** the
+`handle_path /.well-known/*` file-server block:
+
+```caddy
+# Tuwunel OIDC endpoints — must be matched before the static well-known handler
+@oidc path /.well-known/openid-configuration /_tuwunel/oidc/*
+handle @oidc {
+    reverse_proxy tuwunel:8008 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+```
+
+To confirm the discovery document is reachable (should return JSON, not 404):
+
+```bash
+curl -s https://YOUR_DOMAIN/.well-known/openid-configuration | jq .issuer
+```
+
+---
+
+## Step 4 — Mount the Secret in Docker (manual/file path only)
+
+> Skip this step on the **Ansible path** — the secret is rendered inline into
+> `tuwunel.toml` from the `keycloak_client_secret` variable (Step 2), and the
+> shipped `docker-compose.yml` does not mount a `keycloak_client_secret` file.
+> This step applies only if you used `client_secret_file` in Step 3, Option A.
 
 Add the secret file as a volume mount for the Tuwunel container. In your
 `docker-compose.yml`, add to the `tuwunel` service's `volumes`:
 
 ```yaml
 volumes:
+  - tuwunel_data:/var/lib/tuwunel
   - ./tuwunel.toml:/etc/tuwunel/tuwunel.toml:ro
-  - tuwunel-data:/var/lib/tuwunel
   - ./turn_shared_secret:/etc/tuwunel/turn_shared_secret:ro
   - ./keycloak_client_secret:/etc/tuwunel/keycloak_client_secret:ro   # ← add this
 ```
@@ -247,20 +341,17 @@ Keycloak through Ansible variables instead of editing files directly.
 
 ### Pre-Deployment Requirement
 
-The standard Ansible `secrets` role generates TURN/registration/LiveKit
-secrets, but it does not generate `keycloak_client_secret`.
-
-Create this file on the target host first:
-
-```bash
-echo -n 'YOUR_KEYCLOAK_CLIENT_SECRET' | sudo tee /opt/matrix/keycloak_client_secret > /dev/null
-sudo chmod 600 /opt/matrix/keycloak_client_secret
-```
+Unlike TURN/registration/LiveKit secrets, the client secret is **not**
+generated by the `secrets` role and is **not** stored as a file on the host.
+It is supplied as the `keycloak_client_secret` variable and rendered inline
+into `tuwunel.toml` (see [Step 2, Ansible path](#ansible-path-recommended)).
+No `keycloak_client_secret` file needs to exist on the target.
 
 ### Variables (group_vars/matrix_servers.yml)
 
-Add the Keycloak variables to your
-`ansible/inventory/group_vars/matrix_servers.yml`:
+Set the Keycloak variables in
+`ansible/inventory/group_vars/matrix_servers.yml` (they ship commented/disabled
+with `keycloak_enabled: false`):
 
 ```yaml
 # ── Keycloak SSO (External Identity Provider) ────────────────────
@@ -272,15 +363,23 @@ keycloak_provider_name: "Keycloak"
 keycloak_trusted: true
 keycloak_registration: true
 keycloak_default: true
+keycloak_client_secret: "the-secret-from-step-1.3"   # prefer an Ansible Vault value
 ```
 
-The `keycloak_client_secret` is managed as a secret file on the server
-(see Step 2), located at `/opt/matrix/keycloak_client_secret` with mode `0600`.
+> **Do not commit a live secret in plaintext.** Encrypt `keycloak_client_secret`
+> with Ansible Vault (see the [Security note in Step 2](#ansible-path-recommended)).
 
 ### Template (tuwunel.toml.j2)
 
 The Ansible template `tuwunel.toml.j2` includes a conditional Keycloak
-block that renders only when `keycloak_enabled` is `true`.
+block that renders only when `keycloak_enabled` is `true`. The
+`Caddyfile.j2` template already contains the [native OIDC routing](#step-35--caddy-routing-for-native-oidc-required)
+unconditionally, so no Caddy changes are needed.
+
+> **Known template issue**: the shipped `tuwunel.toml.j2` currently emits
+> `single_sso = true` **inside** the `[[global.identity_provider]]` block.
+> `single_sso` is a `[global]`-scope key, so it should live under `[global]`
+> instead. Track/fix this if single-button behavior doesn't take effect.
 
 ### Deploy
 
