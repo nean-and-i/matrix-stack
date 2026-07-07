@@ -5,6 +5,9 @@
 server_name = "{{ matrix_domain }}"
 database_path = "/var/lib/tuwunel"
 
+# Avoid adding 💕 to new user display names
+new_user_displayname_suffix = ""
+
 # Network
 address = "0.0.0.0"
 port = {{ tuwunel_port }}
@@ -43,11 +46,12 @@ livekit_service_url = "https://{{ matrix_domain }}/lk-jwt"
 [[global.identity_provider]]
 brand = "{{ keycloak_brand | default('keycloak') }}"
 client_id = "{{ keycloak_client_id }}"
-client_secret_file = "/etc/tuwunel/keycloak_client_secret"
+client_secret = "{{ keycloak_client_secret }}"
 issuer_url = "{{ keycloak_issuer_url }}"
 callback_url = "https://{{ matrix_domain }}/_matrix/client/unstable/login/sso/callback/{{ keycloak_client_id }}"
 name = "{{ keycloak_provider_name | default('Keycloak') }}"
 default = {{ keycloak_default | default(true) | lower }}
 trusted = {{ keycloak_trusted | default(true) | lower }}
 registration = {{ keycloak_registration | default(true) | lower }}
+single_sso = true
 {% endif %}

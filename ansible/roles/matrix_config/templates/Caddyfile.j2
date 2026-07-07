@@ -34,19 +34,23 @@
 		respond 204
 	}
 
-	# LiveKit JWT Service (Element Call token generation)
-	handle_path /lk-jwt/* {
-		reverse_proxy livekit-jwt:{{ livekit_jwt_port }}
-	}
+    # ── LiveKit JWT Service (Element Call token generation) ────────
+    # Element Call requests LiveKit tokens from this endpoint.
+    # The JWT service validates Matrix auth and issues LiveKit JWTs.
+    handle_path /lk-jwt/* {
+            reverse_proxy livekit-jwt:{{ livekit_jwt_port }}
+    }
 
-	# LiveKit SFU WebSocket (video/audio signaling)
-	handle_path /livekit-sfu/* {
-		reverse_proxy host.docker.internal:{{ livekit_ws_port }} {
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			flush_interval -1
-		}
-	}
+    # ── LiveKit SFU WebSocket (video/audio signaling) ─────────────
+    # Element Call connects here for group call signaling.
+    # Media flows directly via UDP (ports 50000-60000).
+    handle_path /livekit-sfu/* {
+            reverse_proxy host.docker.internal:{{ livekit_ws_port }} {
+                    header_up X-Forwarded-For {remote_host}
+                    header_up X-Forwarded-Proto {scheme}
+                    flush_interval -1
+            }
+    }
 
 	# Matrix Client-Server API
 	@matrix path_regexp ^/_matrix/
@@ -66,10 +70,20 @@
 		}
 	}
 
+	# Tuwunel OIDC endpoints (jwks, userinfo, etc.)
+	# need attention as "/usr/share/nginx/html/_tuwunel/oidc/registration" fail, but login UI works instead
+    @tuwunel path /_tuwunel/oidc/jwks
+    handle @tuwunel {
+            reverse_proxy tuwunel:8008 {
+                    header_up X-Forwarded-For {remote_host}
+                    header_up X-Forwarded-Proto {scheme}
+            }
+    }
+
 	# Matrix Synapse Admin API — restricted to server IP only
 	@synapse {
 		path_regexp ^/_synapse/
-		remote_ip 127.0.0.1/8 ::1 {{ matrix_server_ipv4 }} {{ matrix_server_ipv6 }}
+		remote_ip 127.0.0.1/8 ::1 {{ matrix_server_ipv4 }}
 	}
 	handle @synapse {
 		reverse_proxy tuwunel:{{ tuwunel_port }} {

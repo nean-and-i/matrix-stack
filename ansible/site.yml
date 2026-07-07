@@ -20,21 +20,21 @@
   become: true
 
   pre_tasks:
-    - name: Validate required variables
-      ansible.builtin.assert:
-        that:
-          - matrix_domain is defined and matrix_domain | length > 0
-          - matrix_admin_email is defined and matrix_admin_email | length > 0
-          - matrix_server_ipv4 is defined and matrix_server_ipv4 | length > 0
-        fail_msg: >
-          Required variables missing. Set matrix_domain, matrix_admin_email,
-          and matrix_server_ipv4 in inventory/group_vars/matrix_servers.yml
-        quiet: true
+      - name: Validate required variables
+        ansible.builtin.assert:
+            that:
+                - matrix_domain is defined and matrix_domain | length > 0
+                - matrix_admin_email is defined and matrix_admin_email | length > 0
+                - matrix_server_ipv4 is defined and matrix_server_ipv4 | length > 0
+            fail_msg: >
+                Required variables missing. Set matrix_domain, matrix_admin_email,
+                and matrix_server_ipv4 in inventory/group_vars/matrix_servers.yml
+            quiet: true
 
   roles:
-    - { role: common, tags: ['common', 'setup'] }
-    - { role: docker, tags: ['docker', 'setup'] }
-    - { role: secrets, tags: ['secrets'] }
-    - { role: firewall, tags: ['firewall', 'setup'] }
-    - { role: matrix_config, tags: ['config'] }
-    - { role: deploy, tags: ['deploy'] }
+      - { role: common, tags: ["common", "setup"] }
+      - { role: docker, tags: ["docker", "setup"] }
+      - { role: secrets, tags: ["secrets"] }
+      # - { role: firewall, tags: ['firewall', 'setup'] }
+      - { role: matrix_config, tags: ["config"] }
+      - { role: deploy, tags: ["deploy"] }

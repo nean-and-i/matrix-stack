@@ -70,6 +70,23 @@ YOUR_DOMAIN {
 		}
 	}
 
+	# Tuwunel OIDC endpoints (authorize, token, jwks, registration, userinfo, etc.)
+	# IMPORTANT: /.well-known/openid-configuration must be routed here too, and this
+	# block must come BEFORE the static "Well-known delegation for Matrix" block below,
+	# since Caddy uses first-match-wins routing. Tuwunel's next-gen OIDC server (activated
+	# automatically because both [[global.identity_provider]] and [global.well_known.client]
+	# are set in tuwunel.toml) publishes its own discovery document at exactly this path —
+	# if the static file_server matches first, this request 404s instead of reaching Tuwunel,
+	# which breaks native OIDC "Sign In" while leaving the legacy SSO "Register" flow (which
+	# only needs /_matrix/client/v3/login/sso/redirect/*, already proxied above) unaffected.
+	@oidc path /.well-known/openid-configuration /_tuwunel/oidc/*
+	handle @oidc {
+			reverse_proxy tuwunel:8008 {
+					header_up X-Forwarded-For {remote_host}
+					header_up X-Forwarded-Proto {scheme}
+			}
+	}
+
 	# Matrix Synapse Admin API — restricted to server IP only
 	@synapse {
 		path_regexp ^/_synapse/
@@ -87,7 +104,8 @@ YOUR_DOMAIN {
 		}
 	}
 
-	# Well-known delegation for Matrix
+    # Well-known delegation for Matrix (client/server discovery JSON files only —
+    # /.well-known/openid-configuration is carved out above before this is reached)
 	handle_path /.well-known/* {
 		header Content-Type application/json
 		header Access-Control-Allow-Origin *

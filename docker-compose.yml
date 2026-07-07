@@ -109,7 +109,6 @@ services:
       - "YOUR_DOMAIN:host-gateway"
     depends_on:
       - livekit
-      - caddy
 
   # ── Coturn TURN/STUN ────────────────────────────────────────────
   # Relay server for 1:1 WebRTC calls (NAT traversal fallback).
