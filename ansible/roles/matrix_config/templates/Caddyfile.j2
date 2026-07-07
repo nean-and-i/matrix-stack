@@ -6,6 +6,7 @@
 	email {{ matrix_admin_email }}
 }
 
+# Main site - Matrix client API, well-known, Element Web, LiveKit
 {{ matrix_domain }} {
 	# Security headers
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -70,10 +71,17 @@
 		}
 	}
 
-	# Tuwunel OIDC endpoints (jwks, userinfo, etc.)
-	# need attention as "/usr/share/nginx/html/_tuwunel/oidc/registration" fail, but login UI works instead
-    @tuwunel path /_tuwunel/oidc/jwks
-    handle @tuwunel {
+	# Tuwunel OIDC endpoints (authorize, token, jwks, registration, userinfo, etc.)
+	# IMPORTANT: /.well-known/openid-configuration must be routed here too, and this
+	# block must come BEFORE the static "Well-known delegation for Matrix" block below,
+	# since Caddy uses first-match-wins routing. Tuwunel's next-gen OIDC server (activated
+	# automatically because both [[global.identity_provider]] and [global.well_known.client]
+	# are set in tuwunel.toml) publishes its own discovery document at exactly this path —
+	# if the static file_server matches first, this request 404s instead of reaching Tuwunel,
+	# which breaks native OIDC "Sign In" while leaving the legacy SSO "Register" flow (which
+	# only needs /_matrix/client/v3/login/sso/redirect/*, already proxied above) unaffected.
+	@oidc path /.well-known/openid-configuration /_tuwunel/oidc/*
+	handle @oidc {
             reverse_proxy tuwunel:8008 {
                     header_up X-Forwarded-For {remote_host}
                     header_up X-Forwarded-Proto {scheme}
@@ -97,7 +105,8 @@
 		}
 	}
 
-	# Well-known delegation for Matrix
+    # Well-known delegation for Matrix (client/server discovery JSON files only —
+    # /.well-known/openid-configuration is carved out above before this is reached)
 	handle_path /.well-known/* {
 		header Content-Type application/json
 		header Access-Control-Allow-Origin *
@@ -106,7 +115,7 @@
 		file_server
 	}
 
-	# Element Web client
+	# Element Web client (served from official Docker image)
 	handle {
 		reverse_proxy element:80
 	}
@@ -127,6 +136,7 @@
 		format json
 	}
 
+	# Matrix Federation API
 	@federation path_regexp ^/_matrix/
 	handle @federation {
 		reverse_proxy tuwunel:{{ tuwunel_port }} {
@@ -141,6 +151,7 @@
 		}
 	}
 
+	# Fallback
 	handle {
 		respond 404
 	}

@@ -8,6 +8,9 @@ server_name = "YOUR_DOMAIN"
 # Database configuration
 database_path = "/var/lib/tuwunel"
 
+# Avoid adding 💕 to new user display names
+new_user_displayname_suffix = ""
+
 # Network configuration
 address = "0.0.0.0"
 port = 8008
@@ -24,7 +27,7 @@ registration_token = "PLACEHOLDER_REGISTRATION_TOKEN"
 # Federation
 allow_federation = true
 
-# Media
+# Media & Presence
 max_request_size       = 52428800   # 50 MB in bytes
 allow_local_presence   = true
 allow_incoming_presence = true
@@ -42,3 +45,16 @@ server = "YOUR_DOMAIN:443"
 [[global.well_known.rtc_transports]]
 type = "livekit"
 livekit_service_url = "https://YOUR_DOMAIN/lk-jwt"
+
+# # Keycloak SSO (External Identity Provider)
+# [[global.identity_provider]]
+# brand = "keycloak"
+# client_id = "{{ keycloak_client_id }}"
+# client_secret = "{{ keycloak_client_secret }}"
+# issuer_url = "{{ keycloak_issuer_url }}"
+# callback_url = "https://{{ matrix_domain }}/_matrix/client/unstable/login/sso/callback/{{ keycloak_client_id }}"
+# name = "{{ keycloak_provider_name | default('Keycloak') }}"
+# default = true
+# trusted = true
+# registration = true
+# single_sso = true

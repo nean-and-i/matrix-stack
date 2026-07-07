@@ -1,18 +1,19 @@
 # Coturn TURN/STUN server configuration
+# For Matrix VoIP and video calling
 # Managed by Ansible — do not edit manually
 
+# Listening ports
 listening-port={{ coturn_listening_port }}
 tls-listening-port={{ coturn_tls_port }}
 
-# Relay ports (adjusted to avoid LiveKit SFU range)
+# Relay ports for media (adjusted to avoid LiveKit SFU range 50000-60000)
 min-port={{ coturn_relay_min_port }}
 max-port={{ coturn_relay_max_port }}
 
-# External IPs
+# External IPs (your server's public IPs)
 external-ip={{ matrix_server_ipv4 }}
-external-ip={{ matrix_server_ipv6 }}
 
-# Realm
+# Realm (should match your Matrix domain)
 realm={{ matrix_domain }}
 server-name={{ matrix_domain }}
 
@@ -20,14 +21,22 @@ server-name={{ matrix_domain }}
 use-auth-secret
 static-auth-secret={{ turn_shared_secret }}
 
-# TLS Certificates — mounted from Caddy's Let's Encrypt storage
-# caddy_data volume is mounted at /etc/coturn/caddy-data
+# ── TLS Certificates ──────────────────────────────────────────────
+# Caddy's Let's Encrypt certs are mounted read-only from caddy_data volume.
+# caddy_data is mounted at /etc/coturn/caddy-data in the coturn container.
+# Update paths below with YOUR_DOMAIN after configuring.
 cert=/etc/coturn/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/{{ matrix_domain }}/{{ matrix_domain }}.crt
 pkey=/etc/coturn/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/{{ matrix_domain }}/{{ matrix_domain }}.key
 
-# Security
+# Quota and permissions - UNLIMITED for better performance
+# Remove quota restrictions for production use
+# total-quota=100
+# bps-capacity=0
+
+# Security settings
 no-multicast-peers
 no-cli
+# Block private IP ranges from being relayed (security)
 denied-peer-ip=0.0.0.0-0.255.255.255
 denied-peer-ip=10.0.0.0-10.255.255.255
 denied-peer-ip=172.16.0.0-172.31.255.255
@@ -45,22 +54,42 @@ denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
 # IPv6 ULA (private)
 denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
 
+# Allow loopback for testing
+# no-loopback-peers
+
 # Logging
+# Log to stdout for Docker log collection
 log-file=stdout
 {% if coturn_verbose %}
+# Enable verbose for troubleshooting (disable in production if needed)
 verbose
 {% endif %}
 
 # Performance
+# Use multiple listening IPs
 listening-ip=0.0.0.0
 listening-ip=::
+
+# Fingerprinting
 fingerprint
+
+# Disable software attribute in TURN messages
 no-software-attribute
+
+# Allow TURN over TCP
 tcp-proxy-port={{ coturn_listening_port }}
+
+# Mobility support
 mobility
 
-# Disable unauthenticated STUN to prevent UDP amplification attacks
+# Disable unauthenticated STUN to prevent UDP amplification attacks (Shadowserver CVE)
+# Authenticated TURN users still get mapped-address discovery via TURN allocations.
 no-stun
+
+# Performance optimizations
 max-bps={{ coturn_max_bps }}
 user-quota=0
 total-quota=0
+
+# Prometheus metrics (optional)
+# prometheus

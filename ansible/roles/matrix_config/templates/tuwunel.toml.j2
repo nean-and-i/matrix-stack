@@ -2,7 +2,9 @@
 # Managed by Ansible — do not edit manually
 
 [global]
+# Server identity
 server_name = "{{ matrix_domain }}"
+# Database configuration
 database_path = "/var/lib/tuwunel"
 
 # Avoid adding 💕 to new user display names
@@ -12,10 +14,12 @@ new_user_displayname_suffix = ""
 address = "0.0.0.0"
 port = {{ tuwunel_port }}
 
-# Performance
+# Performance tuning - optimized for production
+# RocksDB cache (increased for better performance)
 db_cache_capacity_mb = {{ tuwunel_db_cache_mb }}
 
-# Registration (token-protected)
+# Registration configuration
+# Registration is protected - users need a registration token
 allow_registration = {{ tuwunel_allow_registration | lower }}
 registration_token = "{{ registration_token }}"
 
@@ -27,7 +31,7 @@ max_request_size       = {{ tuwunel_max_request_size }}
 allow_local_presence   = {{ tuwunel_allow_presence | lower }}
 allow_incoming_presence = {{ tuwunel_allow_presence | lower }}
 
-# TURN for VoIP and video calls
+# TURN/TURNS configuration for VoIP and video calls
 turn_uris = [{% for uri in turn_uris %}"{{ uri }}"{{ ", " if not loop.last else "" }}{% endfor %}]
 turn_secret_file = "/etc/tuwunel/turn_shared_secret"
 turn_ttl = {{ turn_ttl }}

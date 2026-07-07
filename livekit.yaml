@@ -6,7 +6,8 @@ port: 7880
 
 bind_addresses:
   - ""
-  # - "127.0.0.1" # not working
+  # Note: "127.0.0.1" would be more secure but doesn't work with LiveKit's
+  # host network mode — Caddy's host.docker.internal can't reach it.
 
 rtc:
   # TCP port for WebRTC (fallback when UDP is blocked)
