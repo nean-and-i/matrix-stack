@@ -90,6 +90,7 @@ services:
       - LIVEKIT_URL=wss://{{ matrix_domain }}/livekit-sfu
       - LIVEKIT_KEY={{ livekit_api_key }}
       - LIVEKIT_SECRET={{ livekit_api_secret }}
+      - LIVEKIT_FULL_ACCESS_HOMESERVERS={{ matrix_domain }}
     networks:
       - matrix_internal
     expose:

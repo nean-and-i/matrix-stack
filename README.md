@@ -401,6 +401,13 @@ Element Call uses LiveKit as the SFU for group calls. The call flow:
 `use_exclusively: true` in `element-config.json` forces all calls through
 Element Call (both 1:1 and group). Remove it to use legacy VoIP for 1:1 calls.
 
+`LIVEKIT_FULL_ACCESS_HOMESERVERS` (set on `livekit-jwt` in `docker-compose.yml`,
+via `matrix_domain` in the Ansible template) lists which homeservers'
+users are allowed to create LiveKit rooms rather than only join existing
+ones. It's set to this server's own domain so local users can start group
+calls; federated users from other homeservers can still join a call already
+in progress.
+
 ### TURN (Coturn)
 Coturn provides authenticated TURN relay for NAT traversal. STUN is disabled
 (`no-stun`) to prevent UDP amplification attacks (Shadowserver CVE). Clients

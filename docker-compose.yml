@@ -101,6 +101,7 @@ services:
       - LIVEKIT_URL=wss://YOUR_DOMAIN/livekit-sfu
       - LIVEKIT_KEY=PLACEHOLDER_LIVEKIT_KEY
       - LIVEKIT_SECRET=PLACEHOLDER_LIVEKIT_SECRET
+      - LIVEKIT_FULL_ACCESS_HOMESERVERS=YOUR_DOMAIN
     networks:
       - matrix_internal
     expose:

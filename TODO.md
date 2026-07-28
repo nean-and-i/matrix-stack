@@ -42,6 +42,7 @@
 - [x] Dropped coturn IPv6 `external-ip` — deployment defaults are now IPv4-only (IPv6 optional)
 - [x] element-config.json: identity server → matrix.org, removed stale scalar-staging widget URL
 - [x] Documentation — added `docs/keycloak-integration.md`; reconciled README + Keycloak doc with actual code (secret mechanism, native OIDC, IPv6, file tree)
+- [x] Added `LIVEKIT_FULL_ACCESS_HOMESERVERS` to `livekit-jwt` (root `docker-compose.yml` + Ansible template), synced to `verify-config.sh` and README
 
 ## Open
 

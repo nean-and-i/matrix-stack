@@ -252,6 +252,13 @@ else
     ((ERRORS++))
 fi
 
+if grep -q "LIVEKIT_FULL_ACCESS_HOMESERVERS=" docker-compose.yml 2>/dev/null; then
+    echo -e "${GREEN}✓${NC} LIVEKIT_FULL_ACCESS_HOMESERVERS set (room creation permission for this homeserver)"
+else
+    echo -e "${YELLOW}⚠${NC}  LIVEKIT_FULL_ACCESS_HOMESERVERS not set — lk-jwt-service may deny room creation"
+    ((WARNINGS++))
+fi
+
 # Check well-known rtc_foci
 if [[ -f "wellknown/matrix/client" ]]; then
     if grep -q 'rtc_foci' wellknown/matrix/client 2>/dev/null; then
